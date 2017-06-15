@@ -1,0 +1,29 @@
+<?php
+
+function my_donate_schema(){
+$schema = array();
+	
+	
+$schema['my_donate'] = array(
+  'description' => 'donate_module',
+  'fields' => array(
+    'my_donate_id' => array(
+      'description' => 'donate id',
+      'type' => 'serial',
+      'not null' => TRUE,
+    ),
+    'link_name' => array(
+      'description' => 'name of link donate',
+      'type' => 'varchar',
+      'length' => '200',
+      'not null' => TRUE,
+    ),
+  ),
+  'primary key' => array('my_donate_id'),
+  'indexes' => array(
+    'my_donate_id' => array('my_donate_id'),
+  ),
+);
+
+	return $schema;
+}

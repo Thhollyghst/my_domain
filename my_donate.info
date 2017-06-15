@@ -1,0 +1,5 @@
+name = "My donate"
+description = "The module allows to create a donate link"
+core = "7.x"
+version = "7.x-1.0"
+configure = admin/config/my_donate

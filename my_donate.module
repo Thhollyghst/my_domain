@@ -1,0 +1,271 @@
+<?php
+
+function my_donate_permission() {
+  return array(
+    'administer my module' => array(
+      'title' => t('Access My Donate'),
+      'description' => t('Access My Donate'),
+    ),
+  );
+}
+
+function my_donate_menu() {
+	$items['admin/config/my_donate'] = array(
+	  'title' => 'My donate',
+	  'type' => MENU_CALLBACK,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('my_donate_form'),
+	  'access arguments' => array('Administer My Donate'),
+	  'access callback' => TRUE,
+
+    );
+    return $items;
+  }
+function my_donate_form($form, &$form_state)
+{
+
+    // Fieldset container where we can add unlimited values
+    $form['closed_mon_exceptions'] = array(
+        '#type' => 'fieldset',
+        '#tree' => TRUE,
+        '#prefix' => '<div id="closed_mon">',
+        '#suffix' => '</div>',
+        '#description' => t('Exceptions to our typical closed Mondays.'),
+    );
+    // Add a flag to add on additional Mondays if the user clicks "Add Open Monday"
+    $form_state['storage']['add_monday'] = isset($form_state['storage']['add_monday']) ? $form_state['storage']['add_monday'] : 0;
+    //i $form_state['storage']['add_link'] = isset($form_state['storage']['add_link']) ? $form_state['storage']['add_link'] : 0;
+    if (isset($form_state['clicked_button']) && $form_state['clicked_button']['#value'] == 'Add Open Monday') {
+        $form_state['storage']['add_monday']++;
+        //$form_state['storage']['add_link']++;
+    }
+
+    // If the user clicked to remove a day, need to regenerate the dates with that value removed
+    if (isset($form_state['clicked_button']) && $form_state['clicked_button']['#value'] == 'Remove Monday') {
+        // get current values from form_state
+        $closed_mon_dates_array = $form_state['values']['closed_mon_exceptions'];
+        $closed_links_array = $form_state['values']['closed_link_exceptions'];
+
+
+        // remove the Add Open Monday button from this array
+        array_pop($closed_mon_dates_array);
+        array_pop($closed_links_array);
+        // retrieve the index of the one we need to remove
+        $remove_mon = $form_state['clicked_button']['#name'];
+        // Try to remove that value from any array it's being used in
+        //unset($form['closed_mon_exceptions'][$remove_mon]);
+        unset($form_state['values']['closed_mon_exceptions'][$remove_mon]);
+        unset($form_state['complete form']['closed_mon_exceptions'][$remove_mon]);
+        unset($closed_mon_dates_array[$remove_mon]);
+
+        unset($form_state['values']['closed_link_exceptions'][$remove_mon]);
+        unset($form_state['complete form']['closed_link_exceptions'][$remove_mon]);
+        unset($closed_links_array[$remove_mon]);
+        // reorder the array, so we have expected 0 through (count-1) indices
+        $closed_mon_dates_array = array_values($closed_mon_dates_array);
+        $closed_links_array = array_values($closed_links_array);
+    } else {
+        // if we're not trying to remove a monday, just get the saved values
+        $closed_mon_dates_array = variable_get('closed_mon_exceptions');
+        $closed_links_array = variable_get('closed_link_exceptions');
+
+    }
+    // dpm($closed_mon_dates_array);
+    //dpm($form_state);
+    $num_closed_mondays = count($closed_mon_dates_array);
+    $num_closed_links = count($closed_links_array);
+
+    // Add all the current closed Monday exceptions
+
+    /*for ($i = 0; $i < $num_closed_links; $i++) {
+        if (isset($closed_links_array[$i])) {
+            $current_link_val = $closed_links_array[$i];
+            // Remove the value for the button, if this data was pulled from
+            // $form_state above
+            if (count($current_link_val) == 4) {
+                array_pop($current_link_val);
+            }
+        }
+        dpm($current_link_val);
+
+
+        if ($form_state['storage']['add_link'] > 0) {
+            // Starting index for adding open Mondays
+            $i = count($closed_links_array);
+            $number_to_add = $form_state['storage']['add_monday'];
+            $end_index = $i + $number_to_add;
+            for ($index = $i; $index < $end_index; $index++) {
+
+                $form['closed_link_exceptions'][$i] = array(
+                    '#type' => 'textfield',
+                    // '#default_value' => '',
+                    '#title' => t('Link'),
+                    '#prefix' => '<div id="link-' . $i . '">',
+                    '#suffix' => '</div>',
+                );
+
+            }
+        }
+    }*/
+    for ($i = 0; $i < $num_closed_mondays; $i++) {
+        if (isset($closed_mon_dates_array[$i])) {
+            $current_date_val = $closed_mon_dates_array[$i];
+            // Remove the value for the button, if this data was pulled from
+            // $form_state above
+            if (count($current_date_val) == 4) {
+                array_pop($current_date_val);
+            }
+        }
+
+        dpm($current_date_val);
+
+        if ($form_state['storage']['add_monday'] > 0) {
+            // Starting index for adding open Mondays
+            $i = count($closed_mon_dates_array);
+            $number_to_add = $form_state['storage']['add_monday'];
+            $end_index = $i + $number_to_add;
+            for ($index = $i; $index < $end_index; $index++) {
+
+                $form['closed_mon_exceptions'][$i] = array(
+                    '#type' => 'date',
+                    '#default_value' => $current_date_val,
+                    '#title' => t('Closed Monday Exception'),
+                    '#prefix' => '<div id="monday-' . $i . '">',
+                    '#suffix' => '</div>',
+                );
+                // Add a remove button for each one
+                $form['closed_mon_exceptions'][$i]['remove_day'] = array(
+                    '#type' => 'button',
+                    '#value' => t('Remove Monday'),
+                    '#name' => "$i",
+                    '#ajax' => array(
+                        'callback' => 'monday_remove',
+                        'wrapper' => 'closed_mon' // Update the whole fieldset
+                        //'wrapper' => 'monday-' . $i, // Alternately, try to update just this value
+                    ),
+                );
+            }
+
+            // Check if user clicked "Add Open Monday"
+            if ($form_state['storage']['add_monday'] > 0) {
+                // Starting index for adding open Mondays
+                $i = count($closed_mon_dates_array);
+                $number_to_add = $form_state['storage']['add_monday'];
+                $end_index = $i + $number_to_add;
+                for ($index = $i; $index < $end_index; $index++) {
+
+                    $form['closed_mon_exceptions'][$index] = array(
+                        '#type' => 'date',
+                        '#default_value' => array(),
+                        '#title' => t('Closed Monday Exception'),
+                        '#tree' => TRUE,
+                        '#prefix' => '<div id="monday-' . $index . '">',
+                        '#suffix' => '</div>',
+                    );
+
+                    $form['closed_link_exceptions'][$index] = array(
+                        '#type' => 'textfield',
+                        //'#default_value' => array(),
+                        '#title' => t('Link'),
+                        '#tree' => TRUE,
+                        '#prefix' => '<div id="monday-' . $index . '">',
+                        '#suffix' => '</div>',
+                    );
+                    $form['closed_mon_exceptions'][$index]['remove_day'] = array(
+                        '#type' => 'button',
+                        '#value' => t('Remove Monday'),
+                        '#name' => "$index",
+                        '#ajax' => array(
+                            'callback' => 'monday_remove',
+                            'wrapper' => 'closed_mon',
+                            //'wrapper' => 'monday-' . $index,
+                        ),
+                    );
+                }
+            }
+            $form['closed_mon_exceptions']['add_open_monday'] = array(
+                '#type' => 'button',
+                '#value' => t('Add Open Monday'),
+                '#ajax' => array(
+                    'callback' => 'multi_date_ajax_callback',
+                    'wrapper' => 'closed_mon'
+                ),
+            );
+        }
+    }
+    return system_settings_form($form);
+}
+
+  function monday_remove($form, &$form_state) {
+    //return ''; // Trying to update just the date + remove button field
+    $form_state['rebuild'] = TRUE; // Tried adding this for troubleshooting; not seeing any difference
+    return $form['closed_mon_exceptions'];
+  }
+
+  function multi_date_ajax_callback($form, &$form_state) {
+    return $form['closed_mon_exceptions'];
+  }
+/**
+ * Form builder.
+ */
+/*function my_donate_add_more($form, &$form_state) {
+  $form['names'] = array(
+    '#tree' => TRUE,
+    '#prefix' => '<div id="names-wrapper">',
+    '#suffix' => '</div>',
+  );
+
+  // See example_add_more_form_add().
+  if (empty($form_state['name_count'])) {
+    $form_state['name_count'] = 1;
+  }
+	//$links = array(variable_get('my_module_results'));
+	
+  for ($i = 0; $i < $form_state['name_count']; $i++) {
+    $form['names'][$i]['name'] = array(
+      '#type' => 'textfield',
+	  '#title' => t('Link'),
+		//'#values' =>$link,
+			
+    );
+  }
+	}
+
+  $form['add_more'] = array(
+    '#type' => 'submit',
+    '#value' => t('Add more'),
+    '#submit' => array('my_donate_add_more_add'),
+    '#ajax' => array( // <-- New
+      'wrapper' => 'names-wrapper',
+      'callback' => 'my_donate_add_more_update',
+    ),
+  );
+
+	 $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+
+	 $form['#submit'][] = 'my_donate_form_submit';
+
+  return $form;
+}
+
+function my_donate_add_more_add($form, &$form_state) {
+  $form_state['name_count']++;
+  $form_state['rebuild'] = TRUE;
+}
+
+
+function my_donate_add_more_update($form, $form_state) {
+  return $form['names'];
+}
+
+function my_donate_form_submit($form, &$form_state) {
+
+
+	//$link =	array($form_state['values']['names']);
+	variable_set('my_module_results',$form_state['values']['names']);
+
+
+}*/
